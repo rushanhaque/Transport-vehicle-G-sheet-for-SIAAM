@@ -1,0 +1,23 @@
+{
+  "name": "siaam-transport-ledger",
+  "version": "2.0.0",
+  "description": "Modern financial ledger PWA for SIAAM Land Transport Co.",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "dev": "python -m http.server 8000"
+  },
+  "keywords": [
+    "ledger",
+    "finance",
+    "transport",
+    "pwa",
+    "accounting"
+  ],
+  "author": "SIAAM Land Transport Co.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/siaam-transport-ledger.git"
+  }
+}

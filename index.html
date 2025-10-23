@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>SIAAM Land Transport Co.</title>
+  <meta name="theme-color" content="#0ea5e9" />
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icons/icon-192.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .animate-slide { animation: slideIn 0.3s ease-out; }
+    .animate-fade { animation: fadeIn 0.2s ease-out; }
+    .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .card-hover { transition: all 0.3s ease; }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+    .toast { position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 250px; max-width: calc(100vw - 40px); }
+    @media (max-width: 640px) {
+      .toast { top: 10px; right: 10px; left: 10px; min-width: auto; }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <div id="toastContainer" class="toast"></div>
+  <div id="app" class="mx-auto max-w-md lg:max-w-6xl min-h-screen flex flex-col">
+    <header class="gradient-bg text-white p-4 lg:p-6 shadow-lg">
+      <div class="flex justify-between items-center gap-2">
+        <div class="flex-1 min-w-0">
+          <h1 class="text-lg lg:text-2xl font-bold truncate">SIAAM Transport</h1>
+          <div id="dateStamp" class="text-xs lg:text-sm opacity-90 mt-1"></div>
+        </div>
+        <button id="settingsBtn" class="p-2 px-3 text-sm rounded-lg bg-white/20 hover:bg-white/30 transition whitespace-nowrap">Settings</button>
+      </div>
+    </header>
+
+    <main id="mainView" class="flex-1 p-4 lg:p-6 space-y-6 animate-fade">
+      <div id="dashboard" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-gradient-to-br from-green-400 to-green-600 text-white p-4 lg:p-6 rounded-xl shadow-lg">
+          <div class="text-xs lg:text-sm opacity-90">Total Received</div>
+          <div id="dashReceived" class="text-2xl lg:text-3xl font-bold mt-2">0.00</div>
+        </div>
+        <div class="bg-gradient-to-br from-red-400 to-red-600 text-white p-4 lg:p-6 rounded-xl shadow-lg">
+          <div class="text-xs lg:text-sm opacity-90">Total Expenses</div>
+          <div id="dashExpenses" class="text-2xl lg:text-3xl font-bold mt-2">0.00</div>
+        </div>
+        <div class="bg-gradient-to-br from-blue-400 to-blue-600 text-white p-4 lg:p-6 rounded-xl shadow-lg">
+          <div class="text-xs lg:text-sm opacity-90">Net Balance</div>
+          <div id="dashBalance" class="text-2xl lg:text-3xl font-bold mt-2">0.00</div>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <button id="goReceiving" class="card-hover bg-white p-4 lg:p-6 rounded-xl shadow-md border-2 border-transparent hover:border-green-500 active:scale-[.98] transition">
+          <div class="text-base lg:text-lg font-semibold">Record Receiving</div>
+          <div class="text-xs lg:text-sm text-gray-500 mt-1">Add income entry</div>
+        </button>
+        <button id="goExpense" class="card-hover bg-white p-4 lg:p-6 rounded-xl shadow-md border-2 border-transparent hover:border-red-500 active:scale-[.98] transition">
+          <div class="text-base lg:text-lg font-semibold">Record Expense</div>
+          <div class="text-xs lg:text-sm text-gray-500 mt-1">Track spending</div>
+        </button>
+        <button id="goReport" class="card-hover bg-white p-4 lg:p-6 rounded-xl shadow-md border-2 border-transparent hover:border-blue-500 active:scale-[.98] transition">
+          <div class="text-base lg:text-lg font-semibold">View Report</div>
+          <div class="text-xs lg:text-sm text-gray-500 mt-1">Analytics & export</div>
+        </button>
+      </div>
+      <div class="bg-white p-6 rounded-xl shadow-md">
+        <h3 class="text-lg font-semibold mb-4">Monthly Overview</h3>
+        <canvas id="dashChart" height="100"></canvas>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <button id="importData" class="p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition">
+          <div class="font-medium">Import Data</div>
+        </button>
+        <button id="backupData" class="p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition">
+          <div class="font-medium">Backup All</div>
+        </button>
+        <button id="clearData" class="p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition text-red-600">
+          <div class="font-medium">Clear Data</div>
+        </button>
+        <button id="statsView" class="p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition">
+          <div class="font-medium">Statistics</div>
+        </button>
+      </div>
+    </main>
+
+    <section id="receivingView" class="hidden p-4 lg:p-6 space-y-4 animate-slide">
+      <div class="flex items-center justify-between mb-4">
+        <div class="text-2xl font-bold">Record Receiving</div>
+        <button id="backFromReceiving" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">Close</button>
+      </div>
+      <form id="receivingForm" class="bg-white p-6 rounded-xl shadow-md space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-2">Timestamp</label>
+          <input id="rcvTimestamp" type="text" class="w-full border-2 border-gray-200 rounded-lg p-3 bg-gray-50" disabled>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">Date *</label>
+          <input id="rcvDate" type="date" class="w-full border-2 border-gray-200 focus:border-green-500 rounded-lg p-3 transition" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">Amount *</label>
+          <input id="rcvAmount" type="number" inputmode="decimal" step="0.01" class="w-full border-2 border-gray-200 focus:border-green-500 rounded-lg p-3 text-lg font-semibold transition" placeholder="0.00" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">Payment Mode *</label>
+          <select id="rcvMode" class="w-full border-2 border-gray-200 focus:border-green-500 rounded-lg p-3 transition">
+            <option value="Transferred via bank">Bank Transfer</option>
+            <option value="Received in cash">Cash</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">Description</label>
+          <textarea id="rcvDesc" class="w-full border-2 border-gray-200 focus:border-green-500 rounded-lg p-3 transition" rows="2" placeholder="Optional notes..."></textarea>
+        </div>
+        <button type="submit" class="w-full py-4 rounded-lg bg-gradient-to-r from-green-500 to-green-600 text-white font-semibold shadow-lg hover:shadow-xl active:scale-[.98] transition">Save Receiving</button>
+      </form>
+    </section>
+
+    <section id="expenseView" class="hidden p-4 lg:p-6 space-y-4 animate-slide">
+      <div class="flex items-center justify-between mb-4">
+        <div class="text-2xl font-bold">Record Expense</div>
+        <button id="backFromExpense" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">Close</button>
+      </div>
+      <form id="expenseForm" class="bg-white p-6 rounded-xl shadow-md space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-2">Timestamp</label>
+          <input id="expTimestamp" type="text" class="w-full border-2 border-gray-200 rounded-lg p-3 bg-gray-50" disabled>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">Bill Date *</label>
+          <input id="expBillDate" type="date" class="w-full border-2 border-gray-200 focus:border-red-500 rounded-lg p-3 transition" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">Bill Type *</label>
+          <select id="expVat" class="w-full border-2 border-gray-200 focus:border-red-500 rounded-lg p-3 transition">
+            <option value="Non-VAT">Non-VAT bill</option>
+            <option value="VAT">VAT bill (15%)</option>
+          </select>
+        </div>
+        <div id="vatInputs" class="hidden space-y-3 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 animate-fade">
+          <label class="block text-sm font-medium mb-2">VAT Amount *</label>
+          <input id="expVatAmount" type="number" inputmode="decimal" step="0.01" class="w-full border-2 border-blue-300 focus:border-blue-500 rounded-lg p-3 transition" placeholder="Enter VAT amount">
+          <div class="grid grid-cols-2 gap-3 text-sm mt-2">
+            <div class="bg-white p-3 rounded-lg">
+              <div class="text-gray-600">Net Amount</div>
+              <div class="text-xl font-bold text-blue-600" id="calcNetAmount">0.00</div>
+            </div>
+            <div class="bg-white p-3 rounded-lg">
+              <div class="text-gray-600">Gross Amount</div>
+              <div class="text-xl font-bold text-green-600" id="calcGrossAmount">0.00</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">Total Amount *</label>
+          <input id="expAmount" type="number" inputmode="decimal" step="0.01" class="w-full border-2 border-gray-200 focus:border-red-500 rounded-lg p-3 text-lg font-semibold transition" placeholder="0.00" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">Type of Expense *</label>
+          <select id="expType" class="w-full border-2 border-gray-200 focus:border-red-500 rounded-lg p-3 transition">
+            <option value="">-- Select Type --</option>
+            <option value="Inspection">Inspection</option>
+            <option value="Maintenance">Maintenance</option>
+            <option value="Repair">Repair</option>
+            <option value="Fuel">Fuel</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">Description</label>
+          <textarea id="expDesc" class="w-full border-2 border-gray-200 focus:border-red-500 rounded-lg p-3 transition" rows="2" placeholder="Add notes..."></textarea>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-2">Vehicle</label>
+            <select id="expVehicle" class="w-full border-2 border-gray-200 focus:border-red-500 rounded-lg p-3 transition">
+              <option value="">-- Select Vehicle --</option>
+              <option value="USA-8262">USA-8262</option>
+              <option value="USA-8263">USA-8263</option>
+              <option value="USA-8264">USA-8264</option>
+              <option value="USA-8265">USA-8265</option>
+              <option value="NXA-4330">NXA-4330</option>
+              <option value="NXA-4028">NXA-4028</option>
+              <option value="NXA-3805">NXA-3805</option>
+              <option value="XSA-9578">XSA-9578</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-2">ODO Meter</label>
+            <input id="expOdo" type="number" inputmode="numeric" class="w-full border-2 border-gray-200 focus:border-red-500 rounded-lg p-3 transition" placeholder="e.g., 12345">
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">Service Station</label>
+          <input id="expStation" type="text" class="w-full border-2 border-gray-200 focus:border-red-500 rounded-lg p-3 transition" placeholder="Station name">
+        </div>
+        <button type="submit" class="w-full py-4 rounded-lg bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold shadow-lg hover:shadow-xl active:scale-[.98] transition">Save Expense</button>
+      </form>
+    </section>
+
+    <section id="reportView" class="hidden p-4 lg:p-6 space-y-6 animate-slide">
+      <div class="flex items-center justify-between mb-4">
+        <div class="text-2xl font-bold">Reports & Analytics</div>
+        <button id="backFromReport" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">Close</button>
+      </div>
+      <div class="bg-white p-6 rounded-xl shadow-md space-y-4">
+        <h3 class="font-semibold text-lg mb-4">Filter Options</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-2">From Date</label>
+            <input id="repFrom" type="date" class="w-full border-2 border-gray-200 focus:border-blue-500 rounded-lg p-3 transition">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-2">To Date</label>
+            <input id="repTo" type="date" class="w-full border-2 border-gray-200 focus:border-blue-500 rounded-lg p-3 transition">
+          </div>
+        </div>
+        <div class="flex gap-3">
+          <input id="repPrevBalance" type="number" inputmode="decimal" step="0.01" class="flex-1 border-2 border-gray-200 focus:border-blue-500 rounded-lg p-3 transition" placeholder="Previous balance">
+          <button id="repApply" class="px-6 py-3 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold shadow-lg hover:shadow-xl transition">Apply Filter</button>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-2">Search</label>
+          <input id="repSearch" type="text" class="w-full border-2 border-gray-200 focus:border-blue-500 rounded-lg p-3 transition" placeholder="Search by description, vehicle...">
+        </div>
+      </div>
+      <div class="bg-white p-6 rounded-xl shadow-md">
+        <h3 class="font-semibold text-lg mb-4">Summary</h3>
+        <div id="repTotals" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+      </div>
+      <div class="bg-white p-4 lg:p-6 rounded-xl shadow-md overflow-x-auto -mx-4 lg:mx-0">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="font-semibold text-lg">Transactions</h3>
+          <div class="text-sm text-gray-500" id="repCount">0 records</div>
+        </div>
+        <table class="min-w-full text-xs lg:text-sm" id="repTable">
+          <thead class="bg-gradient-to-r from-gray-50 to-gray-100">
+            <tr>
+              <th class="text-left p-2 lg:p-3 border-b-2 font-semibold whitespace-nowrap">Type</th>
+              <th class="text-left p-2 lg:p-3 border-b-2 font-semibold whitespace-nowrap">Date</th>
+              <th class="text-left p-2 lg:p-3 border-b-2 font-semibold whitespace-nowrap">Amount</th>
+              <th class="text-left p-2 lg:p-3 border-b-2 font-semibold whitespace-nowrap">Category</th>
+              <th class="text-left p-2 lg:p-3 border-b-2 font-semibold whitespace-nowrap">Vehicle</th>
+              <th class="text-left p-2 lg:p-3 border-b-2 font-semibold whitespace-nowrap">VAT/Mode</th>
+              <th class="text-left p-2 lg:p-3 border-b-2 font-semibold">Description</th>
+            </tr>
+          </thead>
+          <tbody id="repBody"></tbody>
+        </table>
+      </div>
+      <div class="bg-white p-6 rounded-xl shadow-md">
+        <h3 class="font-semibold text-lg mb-4">Export Options</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <button id="exportCsv" class="p-4 rounded-lg border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 transition">
+            <div class="font-medium">CSV</div>
+            <div class="text-xs text-gray-500">Spreadsheet</div>
+          </button>
+          <button id="exportExcel" class="p-4 rounded-lg border-2 border-gray-300 hover:border-blue-500 hover:bg-blue-50 transition">
+            <div class="font-medium">Excel</div>
+            <div class="text-xs text-gray-500">.xlsx file</div>
+          </button>
+          <button id="exportPdf" class="p-4 rounded-lg border-2 border-gray-300 hover:border-red-500 hover:bg-red-50 transition">
+            <div class="font-medium">PDF</div>
+            <div class="text-xs text-gray-500">Document</div>
+          </button>
+          <button id="exportJson" class="p-4 rounded-lg border-2 border-gray-300 hover:border-purple-500 hover:bg-purple-50 transition">
+            <div class="font-medium">JSON</div>
+            <div class="text-xs text-gray-500">Data file</div>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <footer class="p-3 text-center text-xs text-gray-500">Mobile data entry</footer>
+  </div>
+  <script src="/app-enhanced.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'))
+    }
+  </script>
+</body>
+</html>
